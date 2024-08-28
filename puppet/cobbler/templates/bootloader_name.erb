@@ -1,0 +1,26 @@
+target_name='<%= @boot_disk_name %>'
+target_uuid='<%= @boot_disk_uuid %>'
+shopt -s nocasematch
+shopt -s nocaseglob
+
+
+declare -a matches;
+for sysfs_link in /sys/class/block/*; do
+        if [[ \${sysfs_link\#\#*/} == \$target_name ]]; then
+                matches+=(\${target_name})
+        else
+                dd if=/dev/zero of=\${sysfs_link} bs=512 count=10
+        fi
+done
+
+if (( 0 == \${#matches[@]} )); then
+	echo "ERROR: No disks found with device name \${target_name}" >> /dev/tty1
+	echo "Press Enter to reboot" >> /dev/tty1
+	read
+        exit 1
+fi
+
+cat > /tmp/bootloader.info << _EOT
+bootloader --driveorder=\${matches[0]} --location=mbr --append="net.ifnames=0" --iscrypted --password=grub.pbkdf2.sha512.10000.387014C7BDC6EF6F837605CFDA36CFD657093086F18E378B221C9B9359694B1B49E81698248DB2E6CDE4CD723D674118EA25FDABB3275BE18DD94996533B338B.12DBBEA61CEA5F96DD3EDCFBA1B1F58DBF54C78B4371D84FE0FBD5587469EB41E521C950EEFDF70F8C8A004466913E6E6B1C9F6A30BA46248575028BCBE119CB --timeout=10
+_EOT
+

@@ -1,0 +1,32 @@
+litp create -p /software/profiles/osprofile1 -t os-profile -o name="node-iso" path="/var/www/html/6.4/os/x86_64/"
+
+litp create -p /infrastructure/systems/sys1 -t system -o system_name="sys1"
+
+litp create -t disk -p /infrastructure/systems/sys1/disks/disk0 -o name=hd0 size=512G bootable=true uuid=0x5000c50035ca73fe
+
+litp create -t route -p /infrastructure/networking/routes/fallback -o subnet="0.0.0.0/0" gateway="10.10.10.5"
+
+litp create -p /infrastructure/networking/networks/mgmt -t network -o name='mgmt' subnet='10.10.10.0/24' litp_management=true
+
+litp create -p /deployments/site1 -t deployment
+litp create -p /deployments/site1/clusters/cluster1 -t cluster
+litp create -p /deployments/site1/clusters/cluster1/nodes/node1 -t node -o hostname="node1"
+litp create -p /deployments/site1/clusters/cluster1/nodes/node1/network_interfaces/nic_0 -t eth -o device_name='eth0' macaddress='08:00:27:5B:C1:3F' ipaddress='10.10.10.2' network_name=mgmt
+litp inherit -p /deployments/site1/clusters/cluster1/nodes/node1/os -s /software/profiles/osprofile1
+litp inherit -p /deployments/site1/clusters/cluster1/nodes/node1/system -s /infrastructure/systems/sys1
+litp inherit -p /deployments/site1/clusters/cluster1/nodes/node1/routes/r1 -s /infrastructure/networking/routes/fallback
+
+litp create -p /infrastructure/storage/storage_profiles/profile_1 -t storage-profile-base
+litp inherit -p /deployments/site1/clusters/cluster1/nodes/node1/storage_profile -s /infrastructure/storage/storage_profiles/profile_1
+
+litp create -p /ms/services/cobbler -t cobbler-service
+litp inherit -p /ms/routes/r1 -s /infrastructure/networking/routes/fallback
+litp create -p /ms/network_interfaces/nic_0 -t eth -o device_name='eth0' macaddress='08:00:27:5B:C1:9F' ipaddress='10.10.10.1' network_name=mgmt
+
+litp create_plan
+
+litp run_plan
+
+assertState -p /ms/services/cobbler Applied
+#assertState -p /ms/services Applied
+assertState -p /deployments/site1/clusters/cluster1/nodes/node1/system Applied

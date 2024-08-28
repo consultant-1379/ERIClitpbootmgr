@@ -1,0 +1,30 @@
+# tests to see if a missing network interface cause validation errors
+litp create -t os-profile -p /software/profiles/rhel_6_4 -o name=sample-profile path=/var/www/html/6.4/os/x86_64/
+
+litp create -t system -p /infrastructure/systems/vm1 -o system_name=VM1
+litp create -t disk -p /infrastructure/systems/vm1/disks/disk0 -o name=sda size=28G bootable=true uuid=SATA_QEMU_HARDDISK_QM00001
+
+
+litp create -t network -p /infrastructure/networking/networks/network0 -o name=nodes subnet=10.248.22.0/24 litp_management=true
+
+
+litp create -t storage-profile -p /infrastructure/storage/storage_profiles/profile_1
+litp create -t volume-group -p /infrastructure/storage/storage_profiles/profile_1/volume_groups/vg1 -o volume_group_name=vg_root
+litp create -t file-system -p /infrastructure/storage/storage_profiles/profile_1/volume_groups/vg1/file_systems/root -o type=ext4 mount_point=/ size=16G
+litp create -p /infrastructure/storage/storage_profiles/profile_1/volume_groups/vg1/file_systems/swap -t file-system -o type=swap mount_point=swap size=2G
+litp create -p /infrastructure/storage/storage_profiles/profile_1/volume_groups/vg1/physical_devices/internal -t physical-device -o device_name=sda
+
+litp create -p /ms/network_interfaces/nic0 -t eth -o device_name=eth0 network_name=nodes ipaddress=10.248.22.200 macaddress=08:27:01:ab:cc:dd
+litp create -p /ms/services/cobbler -t cobbler-service
+
+litp create -p /deployments/single_blade -t deployment
+litp create -p /deployments/single_blade/clusters/cluster1 -t cluster
+litp create -p /deployments/single_blade/clusters/cluster1/nodes/node1 -t node -o hostname=node1
+# this disabled line should trigger nic validation errors
+#litp create -p /deployments/single_blade/clusters/cluster1/nodes/node1/network_interfaces/nic0 -t eth0 -o device_name=eth0 macaddress=DE:AD:BE:EF:13:37 ipaddress=10.248.22.201 network_name=nodes
+litp inherit -p /deployments/single_blade/clusters/cluster1/nodes/node1/system -s /infrastructure/systems/vm1
+litp inherit -p /deployments/single_blade/clusters/cluster1/nodes/node1/os -s /software/profiles/rhel_6_4
+
+litp inherit -p /deployments/single_blade/clusters/cluster1/nodes/node1/storage_profile -s /infrastructure/storage/storage_profiles/profile_1
+
+assertError create_plan

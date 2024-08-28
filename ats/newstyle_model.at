@@ -1,0 +1,23 @@
+litp create -t os-profile -p /software/profiles/osprofile1 -o name=node-iso path=/var/www/html/7/os/x86_64/ version=rhel7
+litp create -t route -p /infrastructure/networking/routes/default -o subnet=0.0.0.0/0 gateway=10.10.10.1
+
+litp create -t system -p /infrastructure/systems/system1 -o system_name=MN1VM
+
+litp create -t disk -p /infrastructure/systems/system1/disks/disk0 -o name=hd0 size=512G bootable=true uuid=0x5000c50035ca73fe
+
+litp create -t deployment -p /deployments/deployment1
+litp create -t cluster -p /deployments/deployment1/clusters/cluster1
+litp create -t node -p /deployments/deployment1/clusters/cluster1/nodes/node1 -o hostname=node1
+litp create -t eth -p /deployments/deployment1/clusters/cluster1/nodes/node1/network_interfaces/nic_0 -o device_name=eth0 macaddress=08:00:27:24:8f:27 ipaddress=10.10.10.101 network_name=mgmt
+litp inherit -p /deployments/deployment1/clusters/cluster1/nodes/node1/system -s /infrastructure/systems/system1
+litp inherit -p /deployments/deployment1/clusters/cluster1/nodes/node1/routes/default -s /infrastructure/networking/routes/default
+litp inherit -p /deployments/deployment1/clusters/cluster1/nodes/node1/os -s /software/profiles/osprofile1
+litp create -t storage-profile-base -p /infrastructure/storage/storage_profiles/profile_1
+litp create -t network -p /infrastructure/networking/networks/mgmt -o name=mgmt subnet=10.10.10.0/24 litp_management=true
+litp create -t cobbler-service -p /ms/services/cobbler
+litp create -t eth -p /ms/network_interfaces/nic_0 -o device_name=eth0 macaddress=08:00:27:ab:cd:ef ipaddress=10.10.10.100 network_name=mgmt
+litp inherit -p /ms/routes/default -s /infrastructure/networking/routes/default
+
+litp inherit -p /deployments/deployment1/clusters/cluster1/nodes/node1/storage_profile -s /infrastructure/storage/storage_profiles/profile_1
+
+litp create_plan

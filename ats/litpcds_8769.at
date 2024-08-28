@@ -1,0 +1,11 @@
+# LITPCDS-8769 - exception thrown in create_plan if model contains disk-base items.
+
+runLitpScript newstyle_model.at
+
+# If we have any disks, we need at least one with 'bootable=true'. Apparently volmgr validates this (according
+# to a comment in bootmgr code, anyway...).  So this item is needed just to avoid other, unrelated exceptions.
+
+# This is the item that should trigger the bug.
+litp create -t disk-base -p /infrastructure/systems/system1/disks/disk1
+
+assertError --err_type ValidationError --err_message 'Create plan failed: Node node1 has a disk "disk1" of type "disk-base"' create_plan

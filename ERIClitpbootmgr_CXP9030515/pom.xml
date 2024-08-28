@@ -1,0 +1,223 @@
+<?xml version="1.0"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.ericsson.nms.litp</groupId>
+  <artifactId>ERIClitpbootmgr_CXP9030515</artifactId>
+  <packaging>rpm</packaging>
+  <name>[${project.parent.artifactId}] RPM module</name>
+  <description>LITP bootmgr plugin</description>
+  <parent>
+    <groupId>com.ericsson.nms.litp</groupId>
+    <artifactId>ERIClitpbootmgr</artifactId>
+    <version>2.17.1-SNAPSHOT</version>
+  </parent>
+
+  <properties>
+
+    <local-requires>ERIClitpcore_CXP9030418</local-requires>
+    <!-- publishes the rpm module to the ci portal -->
+    <publish_artifact>true</publish_artifact>
+    <bom_version>RELEASE</bom_version>
+
+    <cobbler_modules_dir>/usr/lib/python2.7/site-packages/cobbler/modules</cobbler_modules_dir>
+    <cobbler_triggers>../src/triggers/cobbler</cobbler_triggers>
+    <pxe_completed_trigger>install_pre_pxe.py</pxe_completed_trigger>
+    <sync_pre_trigger>sync_pre_trigger.py</sync_pre_trigger>
+  </properties>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+      </plugin>
+
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>rpm-maven-plugin</artifactId>
+        <extensions>true</extensions>
+        <inherited>true</inherited>
+
+        <configuration>
+          <requires>
+            <require>python-lxml</require>
+            <require>syslinux</require>
+            <require>wget</require>
+            <require>ERIClitpcore_CXP9030418 &gt;= ${litpcore_version}</require>
+            <require>ERIClitpbootmgrapi_CXP9030523 &gt;= ${litpbootmgrapi_version}</require>
+            <require>ERIClitpnetworkapi_CXP9030514 &gt;= ${litpnetworkapi_version}</require>
+            <require>ERIClitpvolmgrapi_CXP9030947 &gt;= ${litpvolmgrapi_version}</require>
+          </requires>
+
+          <mappings combine.children="append">
+
+            <mapping>
+              <directory>${cobbler_modules_dir}</directory>
+              <configuration>false</configuration>
+              <directoryIncluded>false</directoryIncluded>
+              <filemode>644</filemode>
+              <sources>
+                <source>
+                  <location>${cobbler_triggers}</location>
+                  <includes>
+                    <include>${pxe_completed_trigger}</include>
+                    <include>${sync_pre_trigger}</include>
+                  </includes>
+                </source>
+              </sources>
+            </mapping>
+
+            <mapping>
+              <directory>/usr/sbin</directory>
+              <directoryIncluded>false</directoryIncluded>
+              <configuration>false</configuration>
+              <filemode>755</filemode>
+              <sources>
+                <source>
+                  <location>../fence</location>
+                  <includes>
+                    <include>fence_virsh</include>
+                  </includes>
+                </source>
+              </sources>
+            </mapping>
+
+            <!-- selinux policies -->
+            <mapping>
+              <directory>${app.home}/etc/selinux</directory>
+              <configuration>false</configuration>
+              <sources>
+                <source>
+                  <location>../selinux</location>
+                  <includes>
+                    <include>*.pp</include>
+                  </includes>
+                </source>
+              </sources>
+            </mapping>
+
+          </mappings>
+        </configuration>
+      </plugin>
+        <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>1.3.1</version>
+        <executions>
+            <execution>
+                <id>nosetests</id>
+                <phase>test</phase>
+                <goals>
+                    <goal>exec</goal>
+                </goals>
+            </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+  <profiles>
+    <profile>
+      <id>current-dep</id>
+      <activation>
+        <property>
+          <name>!UsingLatest</name>
+        </property>
+      </activation>
+      <properties>
+        <litpcore_version>2.2.1</litpcore_version>
+        <litpbootmgrapi_version>2.2.4</litpbootmgrapi_version>
+        <litpnetworkapi_version>2.2.0</litpnetworkapi_version>
+        <litpvolmgrapi_version>2.2.0</litpvolmgrapi_version>
+        <litplibvirtapi_version>2.2.0</litplibvirtapi_version>
+        <litpvcsapi_version>2.2.0</litpvcsapi_version>
+      </properties>
+      <dependencies>
+        <dependency>
+          <groupId>com.ericsson.nms.litp</groupId>
+          <artifactId>ERIClitpbootmgrapi_CXP9030523</artifactId>
+          <version>${litpbootmgrapi_version}</version>
+          <type>rpm</type>
+        </dependency>
+        <dependency>
+          <groupId>com.ericsson.nms.litp</groupId>
+          <artifactId>ERIClitpcore_CXP9030418</artifactId>
+          <version>${litpcore_version}</version>
+          <type>rpm</type>
+        </dependency>
+        <dependency>
+          <groupId>com.ericsson.nms.litp</groupId>
+          <artifactId>ERIClitpnetworkapi_CXP9030514</artifactId>
+          <version>${litpnetworkapi_version}</version>
+          <type>rpm</type>
+        </dependency>
+        <dependency>
+          <groupId>com.ericsson.nms.litp</groupId>
+          <artifactId>ERIClitpvolmgrapi_CXP9030947</artifactId>
+          <version>${litpvolmgrapi_version}</version>
+          <type>rpm</type>
+        </dependency>
+        <dependency>
+          <groupId>com.ericsson.nms.litp</groupId>
+          <artifactId>ERIClitplibvirtapi_CXP9030548</artifactId>
+          <version>${litplibvirtapi_version}</version>
+          <type>rpm</type>
+        </dependency>
+        <dependency>
+          <groupId>com.ericsson.nms.litp</groupId>
+          <artifactId>ERIClitpvcsapi_CXP9030871</artifactId>
+          <version>${litpvcsapi_version}</version>
+          <type>rpm</type>
+        </dependency>
+      </dependencies>
+    </profile>
+    <profile>
+      <id>latest-dep</id>
+      <properties>
+        <UsingLatest>true</UsingLatest>
+      </properties>
+      <dependencyManagement>
+        <dependencies>
+          <dependency>
+            <groupId>com.ericsson.litp</groupId>
+            <artifactId>ci-bom</artifactId>
+            <version>${bom_version}</version>
+            <type>pom</type>
+            <scope>import</scope>
+          </dependency>
+        </dependencies>
+      </dependencyManagement>
+      <dependencies>
+        <dependency>
+          <groupId>com.ericsson.nms.litp</groupId>
+          <artifactId>ERIClitpbootmgrapi_CXP9030523</artifactId>
+          <type>rpm</type>
+        </dependency>
+        <dependency>
+          <groupId>com.ericsson.nms.litp</groupId>
+          <artifactId>ERIClitpcore_CXP9030418</artifactId>
+          <type>rpm</type>
+        </dependency>
+        <dependency>
+          <groupId>com.ericsson.nms.litp</groupId>
+          <artifactId>ERIClitpnetworkapi_CXP9030514</artifactId>
+          <type>rpm</type>
+        </dependency>
+        <dependency>
+          <groupId>com.ericsson.nms.litp</groupId>
+          <artifactId>ERIClitpvolmgrapi_CXP9030947</artifactId>
+          <type>rpm</type>
+        </dependency>
+        <dependency>
+          <groupId>com.ericsson.nms.litp</groupId>
+          <artifactId>ERIClitplibvirtapi_CXP9030548</artifactId>
+          <type>rpm</type>
+        </dependency>
+        <dependency>
+          <groupId>com.ericsson.nms.litp</groupId>
+          <artifactId>ERIClitpvcsapi_CXP9030871</artifactId>
+          <type>rpm</type>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
+</project>

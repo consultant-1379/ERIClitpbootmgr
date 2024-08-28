@@ -1,0 +1,20 @@
+#!/bin/bash
+
+for loader in /var/lib/cobbler/loaders/*
+do
+  if [ -d "${loader}" ]
+  then
+    cp -r ${loader} /var/lib/tftpboot/grub/
+
+    (
+      cd /var/lib/tftpboot/grub/"$(basename ${loader})" || return
+
+      for p in ../01-*
+      do
+        f=$(basename $p)
+        f=${f,,}
+        ln -sf $p grub.cfg-$f
+      done
+    )
+  fi
+done

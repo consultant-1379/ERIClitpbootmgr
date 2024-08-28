@@ -1,0 +1,59 @@
+ddns-update-style interim;
+
+allow booting;
+allow bootp;
+deny unknown-clients;
+
+ignore client-updates;
+set vendorclass = option vendor-class-identifier;
+
+<% for network in @networks %>
+subnet <%= network['subnet'] %> netmask <%= network['netmask'] %> {
+     option routers             <% if network['router'] %><%= network['router'] %><% else %>$next_server<% end %>;
+     option subnet-mask         <%= network['netmask'] %>;
+     default-lease-time         604800;
+     max-lease-time             1209600;
+     next-server                $next_server;
+}
+<% end %>
+#for dhcp_tag in $dhcp_tags.keys():
+    ## group could be subnet if your dhcp tags line up with your subnets
+    ## or really any valid dhcpd.conf construct ... if you only use the
+    ## default dhcp tag in cobbler, the group block can be deleted for a
+    ## flat configuration
+# group for Cobbler DHCP tag: $dhcp_tag
+group {
+        #for mac in $dhcp_tags[$dhcp_tag].keys():
+            #set iface = $dhcp_tags[$dhcp_tag][$mac]
+    host $iface.name {
+        hardware ethernet $mac;
+        #if $iface.ip_address:
+        fixed-address $iface.ip_address;
+        #end if
+        #if $iface.hostname:
+        option host-name "$iface.hostname";
+        #end if
+        #if $iface.subnet:
+        option subnet-mask $iface.subnet;
+        #end if
+        #if $iface.gateway:
+        option routers $iface.gateway;
+        #end if
+        #if $iface.mgmt_parameters.get('filename')
+        filename "$iface.mgmt_parameters.get('filename')";
+        #else:
+        filename "$iface.filename";
+        #end if
+        ## Cobbler defaults to $next_server, but some users
+        ## may like to use $iface.system.server for proxied setups
+        #if $iface.next_server:
+        next-server $iface.next_server;
+        #else:
+        next-server $next_server;
+        #end if
+        ## next-server $iface.next_server;
+    }
+        #end for
+}
+#end for
+

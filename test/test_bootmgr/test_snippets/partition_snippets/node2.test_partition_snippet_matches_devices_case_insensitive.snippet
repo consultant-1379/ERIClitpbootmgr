@@ -1,0 +1,77 @@
+# Hash map
+declare -A disk_list
+# Loop through the data structure we have been passed in and build up a bash
+# hash of device paths based on uuid. Clear all disks in the model
+declare -a clearpart_devs
+declare -a parts_to_clear
+disk_list_item=\$(shopt -s nocaseglob; ls /dev/disk/by-id/dm-uuid-mpath*defec8edcafe)
+if [ ! -n "$disk_list_item" ]; then
+disk_list_item=\$(shopt -s nocaseglob; ls /dev/disk/by-id/cciss*defec8edcafe)
+fi
+if [ ! -n "$disk_list_item" ]; then
+disk_list_item=\$(shopt -s nocaseglob; ls /dev/disk/by-id/scsi*defec8edcafe)
+fi
+disk_list["disk2"]=\$disk_list_item
+
+if [[ ! -b \${disk_list["disk2"]} ]]; then
+echo "ERROR: Could not find disk of UUID 'defec8edcafe'" >> /dev/tty1;
+read;
+exit 1;
+fi
+#### clear parts first ####
+parts_to_clear=\$(find /dev/disk/by-id -iname dm-uuid-part*-mpath\*defec8edcafe -printf "disk/by-id/%f,")
+drive_dev=\$(find /dev/disk/by-id -iname dm-uuid-mpath\*defec8edcafe -printf "disk/by-id/%f")
+if [ ! -n "$drive_dev" ] || [ "$drive_dev" == "disk/by-id/" ]; then
+drive_dev=\$(basename \$(find /dev/disk/by-id -iname cciss\*defec8edcafe -printf "%l"))
+fi
+if [ ! -n "$drive_dev" ] || [ "$drive_dev" == "disk/by-id/" ]; then
+drive_dev=\$(basename \$(find /dev/disk/by-id -iname scsi\*defec8edcafe -printf "%l"))
+fi
+
+clearpart_devs=\${clearpart_devs},\${drive_dev}
+for vg in \$(vgs --no-headings | awk '{print \$1}'); do
+vgchange -an $vg --force
+vgreduce --removemissing $vg
+for pv_dev in \$(pvs | grep $vg | awk '{print \$1}'); do
+vgreduce --force --yes $vg $pv_dev --force
+pvremove --force --yes $pv_dev --force
+done;
+vgremove --force --yes $vg --force
+done;
+
+if [ "\${#parts_to_clear}" -gt 2 ]; then
+IFS=',' read -r -a wipedisks <<< "$clearpart_devs,$parts_to_clear"
+else
+IFS=',' read -r -a wipedisks <<< "$clearpart_devs"
+fi
+for wipedisk in \${wipedisks[@]}; do
+partprobe /dev/"$wipedisk"
+wipefs -qfa /dev/"$wipedisk"
+udevadm settle
+sleep 2s
+partprobe /dev/"$wipedisk"
+udevadm settle
+sleep 2s
+parted /dev/"$wipedisk" --script -- mklabel msdos
+done
+
+echo "clearpart --all --drives=\${clearpart_devs/#,/}">/tmp/partitioninfo
+echo "ignoredisk --only-use=\${clearpart_devs/#,/}">>/tmp/partitioninfo
+echo "zerombr">>/tmp/partitioninfo
+# Second loop to generate the partition tables - NB. must be after the clearpart command - hence 2 loops
+dev_path=\$(realpath "/dev/"\${drive_dev})
+dev_name=\$(basename "${dev_path}")
+dev_size=\$(cat "/sys/block/${dev_name}/size")
+disk_size=\$(( 512 * $dev_size / 1024**4 ))
+if [[ "${disk_size}" -ge 2 ]]; then
+echo "part biosboot --fstype=biosboot --size=1 --ondisk=${disk_list["disk2"]}" >> /tmp/partitioninfo
+else
+echo "part extra --fstype=ext4 --size=1 --ondisk=${disk_list["disk2"]}" >> /tmp/partitioninfo
+fi
+echo "part /boot --fstype=xfs --size=1000 --ondisk=${disk_list["disk2"]}" >> /tmp/partitioninfo
+# Create PV(s) for Root VG
+echo "part pv.01vg_root --size=1000 --grow --ondisk=${disk_list["disk2"]}" >> /tmp/partitioninfo
+# Create Root VG
+echo "volgroup vg_root --pesize=4096 pv.01vg_root" >> /tmp/partitioninfo
+# Create Root VG Logical Volumes
+echo "logvol / --fstype=ext4 --name=rvg_root --vgname=vg_root --size=1000 --grow --maxsize=40960" >> /tmp/partitioninfo

@@ -1,0 +1,18 @@
+default=0
+timeout=0
+
+#if $mgmt_parameters.get('filename')
+
+menuentry '$system_name' {
+    linuxefi $kernel_path $kernel_options
+    initrdefi $initrd_path
+}
+
+#else
+
+title $system_name
+    root (nd)
+    kernel $kernel_path $kernel_options
+    initrd $initrd_path
+
+#end if

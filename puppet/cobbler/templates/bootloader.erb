@@ -1,0 +1,118 @@
+target_uuid='<%= @boot_disk_uuid %>'
+shopt -s nocasematch
+shopt -s nocaseglob
+
+declare -a shared_disks
+<% @shared_uuids.each do |uuid| -%>
+# Add each uuid given to a bash array.
+# Use the uuids for comparison as there may be two devices names leading to the same disk
+shared_disks+=(<%= uuid %>)
+<% end -%>
+
+echo \${shared_disks[@]}
+declare -a matches;
+declare -a disk_uuids_to_dd;
+
+for sysfs_link in /sys/class/block/*; do
+        dev_name=\$(udevadm info --query=name --path=\${sysfs_link})
+        #example: udevadm info --query=name --path=/sys/class/block/sdj
+        #         sdj
+        declare -A dev_props
+        while read pair; do
+                prop_name=\${pair%%=*}
+                prop_value=\${pair\#*=}
+                dev_props+=([\${prop_name}]=\${prop_value})
+        done << _EOC
+        \$(udevadm info  --query=property --path=\${sysfs_link})
+_EOC
+
+        if [[ !(\${dev_props['ID_TYPE']} == 'disk' && \${dev_props['DEVTYPE']} == 'disk') ]] ; then
+                unset dev_props;
+                continue
+        fi
+
+	if [[ \${target_uuid} == \${dev_props['ID_SERIAL']} || \${target_uuid} == \${dev_props['ID_BUS']}_\${dev_props['ID_SERIAL']} || \${target_uuid} == \${dev_props['ID_SERIAL_SHORT']} ]]; then
+        matches+=(\${dev_name})
+    else
+        is_shared=false
+        for shared_disk in \${shared_disks[@]}; do
+            if [[ \$shared_disk == \${dev_props['ID_SERIAL']} || \$shared_disk == \${dev_props['ID_SERIAL_SHORT']}  ]]; then
+                # it is a shared disk, do not dd it
+                is_shared=true
+            fi
+        done
+        if [[ "\$is_shared" = false ]]; then
+            # If the uuid is not in the array already, then add it to the array of disks to dd
+            if [[ !(\${disk_uuids_to_dd[@]} =~ \${dev_props['ID_SERIAL']}) ]] ; then
+                disk_uuids_to_dd+=(\${dev_props['ID_SERIAL']})
+            fi
+        fi
+    fi
+
+        unset dev_props
+done
+
+for uuid in \${disk_uuids_to_dd[@]}; do
+    udevadm trigger
+
+    echo 'Running dd command on uuid: ' + \$uuid
+    # For debugging we show the entire contents on this directory
+    ls -l /dev/disk/by-id
+    dd if=/dev/zero of=/dev/disk/by-id/scsi-\${uuid} bs=512 count=10
+done
+
+if (( 0 == \${#matches[@]} )); then
+	echo "ERROR: No disks found with uuid \${target_uuid}" >> /dev/tty1
+	echo "Press Enter to reboot" >> /dev/tty1
+	read
+        exit 1
+elif (( 1 < \${#matches[@]} )); then
+	#example:  matches = [sda sdb sdc sdd]
+	all_matches_are_fc_devices=1
+	declare -A matches_hbas
+
+    #example: udevadm info --query=property --name=sda
+	for match_devname in \${matches[@]}; do
+	    declare -A dev_props
+        while read pair; do
+                prop_name=\${pair%%=*}
+                prop_value=\${pair\#*=}
+                dev_props+=([\${prop_name}]=\${prop_value})
+        done << _EOC
+        \$(udevadm info  --query=property --name=\${match_devname})
+_EOC
+
+        #example: ID_PATH=pci-0000:05:00.0-fc-0x5006016f46e06349-lun-0
+        path=\${dev_props['ID_PATH']}
+
+		if [[ \${path} != *-fc-* ]]; then
+			all_matches_are_fc_devices=0
+			continue
+		fi
+		unset dev_props;
+	done
+
+    if (( 1 != all_matches_are_fc_devices )); then
+        echo "ERROR: not all \${#matches[@]} paths for disk uuid \${target_uuid} are Fibre Channel paths" >> /dev/tty1
+        echo "Press Enter to reboot" >> /dev/tty1
+        read
+        exit 1
+    else
+        sleep 1
+    fi
+    if (( \${#matches[@]} < 4 )); then
+        echo "WARNING: Found only \${#matches[@]} FC paths for disk uuid \${target_uuid}" >> /dev/tty1
+        echo "         For the best redundancy at least 4 paths are recommended, continuing." >> /dev/tty1
+        sleep 5
+    else
+        sleep 1
+    fi
+fi
+
+bootdisk=\$(ls /dev/disk/by-id/dm-uuid-mpath* | grep -i $target_uuid | sed -e 's/\/dev\///g')
+if [ -z "\$bootdisk" ]; then
+bootdisk=\$(ls /dev/disk/by-id/dm-uuid-LVM* | grep -i $target_uuid | sed -e 's/\/dev\///g')
+fi
+cat > /tmp/bootloader.info << _EOT
+bootloader --boot-drive=\${bootdisk} --driveorder=\${matches[0]} --location=mbr --append="net.ifnames=0" --iscrypted --password=grub.pbkdf2.sha512.10000.387014C7BDC6EF6F837605CFDA36CFD657093086F18E378B221C9B9359694B1B49E81698248DB2E6CDE4CD723D674118EA25FDABB3275BE18DD94996533B338B.12DBBEA61CEA5F96DD3EDCFBA1B1F58DBF54C78B4371D84FE0FBD5587469EB41E521C950EEFDF70F8C8A004466913E6E6B1C9F6A30BA46248575028BCBE119CB --timeout=10
+_EOT

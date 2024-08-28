@@ -1,0 +1,36 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.ericsson.nms.litp</groupId>
+    <artifactId>ERIClitpbootmgr</artifactId>
+    <version>2.17.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <parent>
+        <groupId>com.ericsson.litp</groupId>
+        <artifactId>integration</artifactId>
+        <version>2.47.1</version>
+    </parent>
+
+        <properties>
+        <sonar.projectBaseDir>.</sonar.projectBaseDir>
+        <sonar.exclusions>test/resources</sonar.exclusions>
+        <sonar.scm.provider>git</sonar.scm.provider>
+        <sonar.python.xunit.reportPath>./nosetests.xml
+        </sonar.python.xunit.reportPath>
+        <sonar.python.coverage.reportPaths>./coverage.xml
+        </sonar.python.coverage.reportPaths>
+        <sonar.python.coveragePlugin>cobertura</sonar.python.coveragePlugin>
+        <sonar.core.codeCoveragePlugin>cobertura
+        </sonar.core.codeCoveragePlugin>
+        <sonar.sources>../src/,../pom.xml</sonar.sources>
+        <sonar.test.inclusions>**/*test*/**</sonar.test.inclusions>
+        <sonar.tests>../test/</sonar.tests>
+    </properties>
+
+    <scm>
+        <developerConnection>${ericsson.scm.url}</developerConnection>
+      <tag>HEAD</tag>
+  </scm>
+    <modules>
+        <module>ERIClitpbootmgr_CXP9030515</module>
+    </modules>
+</project>

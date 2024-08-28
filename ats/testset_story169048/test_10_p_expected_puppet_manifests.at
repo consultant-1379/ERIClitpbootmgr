@@ -1,0 +1,57 @@
+# Create two file systems under volume group and storage profile
+
+# added to have a defined /etc/sysconfig/keyboard, see torf-123878
+runLitpScript   ../common_setup.atlib
+
+#runLitpScript newstyle_model.at
+litp create -t os-profile -p /software/profiles/osprofile1 -o name=node-iso path=/var/www/html/6.4/os/x86_64/
+
+# Node
+litp create -t deployment -p /deployments/deployment1
+litp create -t cluster -p /deployments/deployment1/clusters/cluster1
+litp create -t node -p /deployments/deployment1/clusters/cluster1/nodes/node1 -o hostname=node1
+litp create -t eth -p /deployments/deployment1/clusters/cluster1/nodes/node1/network_interfaces/nic0 -o device_name=eth0 macaddress=08:00:27:5B:C1:3F ipaddress=10.4.23.51 network_name=public
+litp create -t eth -p /deployments/deployment1/clusters/cluster1/nodes/node1/network_interfaces/nic1 -o device_name=eth1 macaddress=08:00:27:5B:C1:00 pxe_boot_only=true
+
+# Systems
+litp create -t os-profile -p /software/profiles/rhel_os -o name=sample-profile path=/var/www/html/6.4/os/x86_64/
+
+litp create -t system -p /infrastructure/systems/system1 -o system_name=MN1VM
+litp create -t disk -p /infrastructure/systems/system1/disks/disk0 -o name=hd0 size=512G bootable=true uuid=0x5000c50035ca73fe
+
+litp create -t network -p /infrastructure/networking/networks/public -o name=public subnet=10.4.23.0/24 litp_management=true
+litp create -t route -p /infrastructure/networking/routes/default -o subnet=0.0.0.0/0 gateway=10.4.23.1
+
+# Storage-profile stuff
+litp create -t storage-profile -p /infrastructure/storage/storage_profiles/profile_1
+litp create -t volume-group -p /infrastructure/storage/storage_profiles/profile_1/volume_groups/vg1 -o volume_group_name=vg_root
+litp create -t file-system -p /infrastructure/storage/storage_profiles/profile_1/volume_groups/vg1/file_systems/root -o type=ext4 mount_point=/ size=100G
+litp create -t file-system -p /infrastructure/storage/storage_profiles/profile_1/volume_groups/vg1/file_systems/swap -o type=swap mount_point=swap size=32G
+litp create -t physical-device -p /infrastructure/storage/storage_profiles/profile_1/volume_groups/vg1/physical_devices/internal -o device_name=hd0
+
+# Node links
+litp inherit -p /deployments/deployment1/clusters/cluster1/nodes/node1/storage_profile -s /infrastructure/storage/storage_profiles/profile_1
+litp inherit -p /deployments/deployment1/clusters/cluster1/nodes/node1/system -s /infrastructure/systems/system1
+litp inherit -p /deployments/deployment1/clusters/cluster1/nodes/node1/os -s /software/profiles/rhel_os
+litp inherit -p /deployments/deployment1/clusters/cluster1/nodes/node1/routes/default -s /infrastructure/networking/routes/default
+
+# Create cobbler service
+
+litp create -t eth -p /ms/network_interfaces/nic1 -o network_name=public ipaddress=10.4.23.50 device_name=eth0 macaddress=00:11:22:33:44:55
+litp inherit -p /ms/routes/default -s /infrastructure/networking/routes/default
+litp create -t cobbler-service -p /ms/services/cobbler
+
+litp create_plan
+litp run_plan
+
+assertDirectoryContents ../RHEL6/TORF_169048/ /opt/ericsson/nms/litp/etc/puppet/manifests/plugins/
+
+# Test for OS version RHEL7
+litp prepare_restore
+litp update -p /software/profiles/osprofile1 -o name=node-iso path=/var/www/html/7/os/x86_64/ version=rhel7
+litp update -p /software/profiles/rhel_os -o name=sample-profile path=/var/www/html/7/os/x86_64/ version=rhel7
+
+litp create_plan
+litp run_plan
+
+assertDirectoryContents TORF_169048/ /opt/ericsson/nms/litp/etc/puppet/manifests/plugins/

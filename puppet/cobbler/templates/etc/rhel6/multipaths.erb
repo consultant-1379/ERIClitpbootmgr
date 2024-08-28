@@ -1,0 +1,25 @@
+cat << EOF >> /etc/multipath.conf
+blacklist_exceptions {
+    <% for mpath in mpaths %>
+    wwid <%= mpath['uid'] %>
+    <% end %>
+}
+multipaths {
+    <% for mpath in mpaths %>
+        multipath {
+            uid 0
+            gid 0
+            wwid <%= mpath['uid'] %>
+            alias <%= mpath['alias'] %>
+            mode 0600
+    }
+    <% end %>
+}
+EOF
+
+chkconfig multipathd on
+# from redhat + emc to get alua working properly
+sed -ri 's|root=[A-Z0-9a-z_/\-]+|& rdloaddriver=scsi_dh_alua|g' /boot/grub/grub.conf
+# rebuild initrd image
+dracut --force
+ls /etc

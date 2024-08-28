@@ -1,0 +1,73 @@
+# Create two file systems under volume group and storage profile
+
+litp create -t os-profile -p /software/profiles/osprofile1 -o name=node-iso path=/var/www/html/6.4/os/x86_64/
+litp create -t network -p /infrastructure/networking/networks/mgmt -o name=nodes subnet=10.4.23.0/24 litp_management=true
+
+# Node
+litp create -t deployment -p /deployments/deployment1
+litp create -t vcs-cluster -p /deployments/deployment1/clusters/cluster1 -o cluster_type=sfha llt_nets="heartbeat1,heartbeat2" low_prio_net="mgmt" cluster_id="1"
+litp create -t node -p /deployments/deployment1/clusters/cluster1/nodes/node1 -o hostname=node1
+litp create -t eth -p /deployments/deployment1/clusters/cluster1/nodes/node1/network_interfaces/nic_0 -o device_name=eth0 macaddress=08:00:27:5B:C1:3F ipaddress=10.4.23.51 network_name=nodes
+
+litp create -t disk -p /deployments/deployment1/clusters/cluster1/fencing_disks/fd1 -o uuid=30000000fc85c928 size=100M name=fencing_disk_1
+litp create -t disk -p /deployments/deployment1/clusters/cluster1/fencing_disks/fd2 -o uuid=30000000ef27515f size=100M name=fencing_disk_2
+litp create -t disk -p /deployments/deployment1/clusters/cluster1/fencing_disks/fd3 -o uuid=30000000dbc0f9c6 size=100M name=fencing_disk_3
+
+# Systems
+litp create -t os-profile -p /software/profiles/rhel_6_4 -o name=sample-profile path=/profiles/node-iso/
+
+litp create -t system -p /infrastructure/systems/system1 -o system_name=MN1VM
+litp create -t disk -p /infrastructure/systems/system1/disks/disk0 -o name=hd0 size=512G bootable=true uuid=kgb1
+
+litp create -t route -p /infrastructure/networking/routes/r1 -o subnet=0.0.0.0/0 gateway=10.4.23.1
+
+# Storage-profile stuff
+litp create -t storage-profile -p /infrastructure/storage/storage_profiles/profile_1
+litp create -t volume-group -p /infrastructure/storage/storage_profiles/profile_1/volume_groups/vg1 -o volume_group_name=vg_root
+litp create -t file-system -p /infrastructure/storage/storage_profiles/profile_1/volume_groups/vg1/file_systems/root -o type=ext4 mount_point=/ size=100G
+litp create -t file-system -p /infrastructure/storage/storage_profiles/profile_1/volume_groups/vg1/file_systems/swap -o type=swap mount_point=swap size=32G
+litp create -t physical-device -p /infrastructure/storage/storage_profiles/profile_1/volume_groups/vg1/physical_devices/internal -o device_name=hd0
+
+# Node links
+litp inherit -p /deployments/deployment1/clusters/cluster1/nodes/node1/storage_profile -s /infrastructure/storage/storage_profiles/profile_1
+litp inherit -p /deployments/deployment1/clusters/cluster1/nodes/node1/system -s /infrastructure/systems/system1
+litp inherit -p /deployments/deployment1/clusters/cluster1/nodes/node1/os -s /software/profiles/rhel_6_4
+litp inherit -p /deployments/deployment1/clusters/cluster1/nodes/node1/routes/default -s /infrastructure/networking/routes/r1
+
+# Create cobbler service
+
+litp create -t cobbler-service -p /ms/services/cobbler
+litp create -t eth -p /ms/network_interfaces/nic_0 -o device_name=eth0 macaddress=08:10:27:5B:C1:3F ipaddress=10.4.23.50 network_name=nodes
+litp inherit -p /ms/routes/default -s /infrastructure/networking/routes/r1
+
+
+litp create_plan
+
+assertTaskInPlan cb__write_snippet /ms/services/cobbler
+
+assertConfigTask ms1 cobbler::bootloader node1 /ms/services/cobbler snippet_name='node1.ks.bootloader.snippet' boot_disk_uuid='kgb1' os_version='rhel6' shared_uuids='["30000000fc85c928", "30000000dbc0f9c6", "30000000ef27515f"]'
+
+# Create a second cluster to ensure all fencing disks in deployment are included in the shared_disks parameter
+litp create -t vcs-cluster -p /deployments/deployment1/clusters/cluster2 -o cluster_type=sfha llt_nets="heartbeat1,heartbeat2" low_prio_net="mgmt" cluster_id="2"
+litp create -t disk -p /deployments/deployment1/clusters/cluster2/fencing_disks/fd1 -o uuid=30000000abcdefgh size=100M name=fencing_disk_1
+litp create -t disk -p /deployments/deployment1/clusters/cluster2/fencing_disks/fd2 -o uuid=30000000ijklmnop size=100M name=fencing_disk_2
+litp create -t disk -p /deployments/deployment1/clusters/cluster2/fencing_disks/fd3 -o uuid=30000000qrstuvwx size=100M name=fencing_disk_3
+
+litp create -t node -p /deployments/deployment1/clusters/cluster2/nodes/node2 -o hostname=node2
+litp create -t eth -p /deployments/deployment1/clusters/cluster2/nodes/node2/network_interfaces/nic_0 -o device_name=eth0 macaddress=08:00:27:5B:C1:3A ipaddress=10.4.23.59 network_name=nodes
+litp create -t system -p /infrastructure/systems/system2 -o system_name=MN2VM
+litp create -t disk -p /infrastructure/systems/system2/disks/disk0 -o name=hd0 size=512G bootable=true uuid=kgb2
+litp inherit -p /deployments/deployment1/clusters/cluster2/nodes/node2/system -s /infrastructure/systems/system2
+litp inherit -p /deployments/deployment1/clusters/cluster2/nodes/node2/os -s /software/profiles/rhel_6_4
+litp inherit -p /deployments/deployment1/clusters/cluster2/nodes/node2/storage_profile -s /infrastructure/storage/storage_profiles/profile_1
+
+
+litp create_plan
+
+assertTaskInPlan cb__write_snippet /ms/services/cobbler
+
+assertConfigTask ms1 cobbler::bootloader node1 /ms/services/cobbler snippet_name='node1.ks.bootloader.snippet' boot_disk_uuid='kgb1' os_version='rhel6' shared_uuids='["30000000abcdefgh", "30000000qrstuvwx", "30000000ijklmnop", "30000000fc85c928", "30000000dbc0f9c6", "30000000ef27515f"]'
+
+
+litp run_plan
+

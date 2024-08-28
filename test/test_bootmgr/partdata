@@ -1,0 +1,18 @@
+# bash4 hash map
+declare -A disk_list
+# loop through the data structure we have been passed in and build up a bash hash of device paths based on
+disk_list["0x500fe114da65e700"]=\$(ls /dev/disk/by-id/scsi*0x500fe114da65e700)
+drive_dev=\$(basename \$(find /dev/disk/by-id -name scsi\*0x500fe114da65e700 -printf "%l"))
+clearpart_devs=\${clearpart_devs},\${drive_dev}
+disk_list["0x5000c50035ca73fe"]=\$(ls /dev/disk/by-id/scsi*0x5000c50035ca73fe)
+drive_dev=\$(basename \$(find /dev/disk/by-id -name scsi\*0x5000c50035ca73fe -printf "%l"))
+clearpart_devs=\${clearpart_devs},\${drive_dev}
+echo "clearpart --all --drives=\${clearpart_devs/#,/}">/tmp/partitioninfo
+# second loop to generate the partition tables - nb must be after the clearpart command - hence 2 loops
+echo "part /boot --fstype=ext4 --size=500 --ondisk=${disk_list["0x5000c50035ca73fe"]}">>/tmp/partitioninfo
+echo "part pv.01root_vg --size=18432 --ondisk=${disk_list["0x500fe114da65e700"]}">>/tmp/partitioninfo
+echo "volgroup root_vg --pesize=4096 pv.01root_vg">>/tmp/partitioninfo
+echo "part pv.01root_vg --size=19980 --ondisk=${disk_list["0x5000c50035ca73fe"]}">>/tmp/partitioninfo
+echo "volgroup root_vg --pesize=4096 pv.01root_vg">>/tmp/partitioninfo
+echo "logvol /foo --fstype=raw --name=root --vgname=root_vg --size=10240">>/tmp/partitioninfo
+echo "logvol /swap --fstype=swap --name=swap --vgname=root_vg --size=3072">>/tmp/partitioninfo

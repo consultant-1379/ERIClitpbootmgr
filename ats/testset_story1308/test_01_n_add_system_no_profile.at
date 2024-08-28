@@ -1,0 +1,23 @@
+#        Description:
+#            Test to ensure that when a node os is not linked to a profile, the
+#            plan won't be created (validation check will detect this condition)
+#        Result:
+#            A UnresolvedLinkError error is reported
+#            when attempting to create_plan
+ 
+runLitpScript two-node-std.inc
+
+litp create -t deployment -p /deployments/d1
+litp create -t cobbler-service -p /ms/services/cobbler
+litp create -p /deployments/d1/clusters/tmp -t cluster
+litp create -p /infrastructure/systems/system_node_99 -t system -o system_name='MNTEST'
+litp create -p /infrastructure/systems/system_node_99/disks/disk0 -t disk -o name=sda size=100G bootable=true uuid='ee7cf0a0-1922-401b-a1ae-6ec9261484c0'
+litp create -p /deployments/d1/clusters/tmp/nodes/node_99 -t node -o hostname='mn99'
+litp create -t route -p /infrastructure/networking/routes/r1 -o subnet=0.0.0.0/0 gateway=10.10.10.1
+
+litp inherit -p /deployments/d1/clusters/tmp/nodes/node_99/routes/r1 -s /infrastructure/networking/routes/r1
+litp inherit -p /deployments/d1/clusters/tmp/nodes/node_99/system -s /infrastructure/systems/system_node_99
+
+litp inherit -p /deployments/d1/clusters/tmp/nodes/node_99/storage_profile -s /infrastructure/storage/storage_profiles/profile_1
+litp create -p /deployments/d1/clusters/tmp/nodes/node_99/network_interfaces/if0 -t eth -o device_name='eth0' macaddress='BB:BB:BB:BB:BB:BB' ipaddress='10.10.10.2' network_name='mgmt'
+assertError --err_message 'ItemType "node" is required to have a "reference" with name "os" and type "os-profile"' --err_type=MissingRequiredItemError create_plan

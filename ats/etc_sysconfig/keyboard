@@ -1,0 +1,4 @@
+KEYTABLE="uk"
+MODEL="pc105"
+LAYOUT="gb"
+KEYBOARDTYPE="pc"

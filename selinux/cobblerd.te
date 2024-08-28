@@ -1,0 +1,57 @@
+
+module cobblerd 2.0;
+
+require {
+    type cert_t;
+    type cobblerd_t;
+    type cobbler_var_log_t;
+    type default_t;
+    type default_context_t;
+    type etc_t;
+    type file_context_t;
+    type httpd_sys_content_t;
+    type proc_net_t;
+    type puppet_var_lib_t;
+    type semanage_read_lock_t;
+    type semanage_store_t;
+    type tftpdir_rw_t;
+    type unlabeled_t;
+    type var_t;
+    type modules_object_t;
+    class capability { net_admin net_raw };
+    class dir { create read write search open getattr add_name remove_name };
+    class file { getattr read open write unlink lock execute execute_no_trans create };
+    class lnk_file { read getattr };
+    class netlink_audit_socket create;
+    class rawip_socket { getopt create };
+
+}
+
+#============= cobblerd_t ==============
+allow cobblerd_t cert_t: dir { read open getattr search };
+allow cobblerd_t cert_t: lnk_file { read getattr };
+allow cobblerd_t cert_t: file { read open getattr };
+allow cobblerd_t cobbler_var_log_t:dir { create read remove_name };
+allow cobblerd_t default_t:dir read;
+allow cobblerd_t default_t:file { getattr read open };
+allow cobblerd_t default_context_t:dir search;
+allow cobblerd_t etc_t:file { write create };
+allow cobblerd_t etc_t:dir { write add_name create };
+allow cobblerd_t file_context_t:dir search;
+allow cobblerd_t httpd_sys_content_t:lnk_file read;
+allow cobblerd_t proc_net_t:file { read getattr open };
+allow cobblerd_t self:capability { net_admin net_raw };
+allow cobblerd_t self:netlink_audit_socket create;
+allow cobblerd_t self:rawip_socket { getopt create };
+allow cobblerd_t semanage_read_lock_t:file { read lock open };
+allow cobblerd_t semanage_store_t:dir { read write search open };
+allow cobblerd_t semanage_store_t:file { read getattr open };
+allow cobblerd_t tftpdir_rw_t:lnk_file read;
+allow cobblerd_t tftpdir_rw_t:file { write getattr open read unlink };
+allow cobblerd_t unlabeled_t:file { getattr read execute open execute_no_trans create};
+allow cobblerd_t var_t:dir { create read write search open };
+allow cobblerd_t var_t:file { getattr read write unlink open };
+allow cobblerd_t var_t:lnk_file { getattr read };
+allow cobblerd_t puppet_var_lib_t:dir { search getattr };
+allow cobblerd_t puppet_var_lib_t:file { open read getattr unlink lock };
+allow cobblerd_t modules_object_t:dir { getattr read write search open };
